@@ -1,0 +1,210 @@
+#!/bin/sh
+
+_sup_usage() {
+	echo "sup - git submodules"
+	echo
+	echo "usage: sup [options] command [arguments]"
+	echo
+	# TODO
+	echo "commands:"
+	echo "  add <repository> [--] [<path>]"
+	echo "  status [<path>]"
+	echo "  remote <path> [<repository>]"
+	echo "  pull [<path>]"
+	echo "  checkout <path>"
+	echo "  clean <path>"
+	echo "  rm <path>"
+	echo
+	echo "options:"
+	# TODO dry run
+	echo "  -h  print this usage"
+	echo "  -q  operate quietly"
+	echo "  -v  verbose output"
+	echo "  -x  echo commands"
+	echo
+	echo "See also 'sup -h <command>' and 'man sup'"
+}
+
+_sup_verbose() {
+	if [ "$SUP_VERBOSE_OUTPUT" = true ]; then
+		echo "$1"
+	fi
+}
+
+_sup_system() {
+	if [ $# = 0 ]; then
+		echo "fatal: no command given to sup_system"
+		exit 1
+	elif [ $# -gt 9 ]; then
+		echo "fatal: sup_system supports at most 9 args"
+		exit 1
+	fi
+
+	if [ "$SUP_ECHO_COMMANDS" = true ]; then
+		echo "+" "$@"
+	fi
+
+	if [ "$SUP_OPERATE_QUIETLY" = true ]; then
+		if [ $# = 1 ]; then
+			"$1" >/dev/null 2>&1
+		elif [ $# = 2 ]; then
+			"$1" "$2" >/dev/null 2>&1
+		elif [ $# = 3 ]; then
+			"$1" "$2" "$3" >/dev/null 2>&1
+		elif [ $# = 4 ]; then
+			"$1" "$2" "$3" "$4" >/dev/null 2>&1
+		elif [ $# = 5 ]; then
+			"$1" "$2" "$3" "$4" "$5" >/dev/null 2>&1
+		elif [ $# = 6 ]; then
+			"$1" "$2" "$3" "$4" "$5" "$6" >/dev/null 2>&1
+		elif [ $# = 7 ]; then
+			"$1" "$2" "$3" "$4" "$5" "$6" "$7" >/dev/null 2>&1
+		elif [ $# = 8 ]; then
+			"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" >/dev/null 2>&1
+		elif [ $# = 9 ]; then
+			"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" >/dev/null 2>&1
+		fi
+	else
+		if [ $# = 1 ]; then
+			"$1"
+		elif [ $# = 2 ]; then
+			"$1" "$2"
+		elif [ $# = 3 ]; then
+			"$1" "$2" "$3"
+		elif [ $# = 4 ]; then
+			"$1" "$2" "$3" "$4"
+		elif [ $# = 5 ]; then
+			"$1" "$2" "$3" "$4" "$5"
+		elif [ $# = 6 ]; then
+			"$1" "$2" "$3" "$4" "$5" "$6"
+		elif [ $# = 7 ]; then
+			"$1" "$2" "$3" "$4" "$5" "$6" "$7"
+		elif [ $# = 8 ]; then
+			"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+		elif [ $# = 9 ]; then
+			"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9"
+		fi
+	fi
+}
+
+sup_add_usage() {
+	# TODO
+	echo "usage"
+}
+
+sup_add() {
+	remote="$2"
+	if [ -z "$remote" ]; then
+		echo "rem"
+		exit 1
+	fi
+
+	project_dir="$(git rev-parse --show-toplevel)"
+
+	submodule="$1"
+	if [ -z "$submodule" ]; then
+		submodule="$(pwd)"
+	fi
+	abs_submodule="$(readlink -f "$submodule")"
+	# shellcheck disable=SC2181
+	if [ "$?" != 0 ]; then
+		abs_submodule="$submodule"
+	fi
+	submodule="$(realpath --relative-to="$project_dir" "$abs_submodule")"
+	# shellcheck disable=SC2181
+	if [ "$?" != 0 ]; then
+		echo "fatal: could not determine relative submodule path"
+		exit 1
+	fi
+
+	cd "$(git rev-parse --show-toplevel)" || echo "fatal: could not cd into project directory" && exit 1
+
+	# TODO  check by path not by name
+	# 	use rel_submodule (now submodule) as name
+	# 	and work with abs_submodule
+	# 	git config --file .gitmodules --get-regexp 'submodule\..*\.path$'
+	if [ "$(git submodule status "$1" 2>/dev/null)" ]; then
+		echo "$submodule"
+		existing_remote="$(git config --file=.gitmodules submodule."$submodule".url)"
+		if [ "$existing_remote" = "$remote" ]; then
+			echo "already all good"
+			exit 0
+		else
+			echo "not good. remote wrong"
+			exit 1
+		fi
+	fi
+
+	if [ "$(git status --porcelain | wc -l)" != 0 ]; then
+		echo "you need a clean worktree to add submodules"
+		exit 1
+	fi
+
+	echo git submodule add "$remote" --name "$submodule" -- "$abs_submodule"
+}
+
+sup_status_usage() {
+	# TODO
+	echo "usage"
+}
+
+sup_status() {
+	# cd project-dir
+	# git submodule status
+	# git status
+}
+
+SUP_OPERATE_QUIETLY=false
+SUP_VERBOSE_OUTPUT=false
+SUP_ECHO_COMMANDS=false
+SUP_PRINT_USAGE=false
+while getopts ":hqvx" opt; do
+	case $opt in
+	h)
+		SUP_PRINT_USAGE=true
+		;;
+	q)
+		SUP_OPERATE_QUIETLY=true
+		;;
+	v)
+		SUP_VERBOSE_OUTPUT=true
+		;;
+	x)
+		SUP_ECHO_COMMANDS=true
+		;;
+	*)
+		echo "invalid option -- '$OPTARG'"
+		echo "try 'sup -h' for more information"
+		exit 1
+		;;
+	esac
+done
+shift $((OPTIND - 1))
+
+command=$1
+if [ -z "$command" ]; then
+	"_sup_usage"
+	exit 1
+elif command -v "sup_$command" >/dev/null; then
+	shift
+	if [ "$SUP_PRINT_USAGE" = true ]; then
+		"sup_${command}_usage"
+		exit 1
+	else
+		# TODO  depends on git and coreutils
+		# 	test with coreutils, busybox and uutils/coreutils
+		if [ ! "$(command -v git)" ]; then
+			echo "fatal: git not found"
+			exit 1
+		fi
+		if [ ! "$(git rev-parse --show-toplevel)" ]; then
+			exit 1
+		fi
+		"sup_${command}" "$@"
+	fi
+else
+	shift
+	echo "invalid command -- '$command'"
+	echo "try 'sub -h' for more information"
+	exit 1
+fi
