@@ -108,12 +108,12 @@ sup_add() {
 	if [ -z "$submodule" ]; then
 		submodule="$(pwd)"
 	fi
-	abs_submodule="$(readlink -f "$submodule")"
+	abs_submodule="$(readlink --canonicalize-missing "$submodule")"
 	# shellcheck disable=SC2181
 	if [ "$?" != 0 ]; then
 		abs_submodule="$submodule"
 	fi
-	rel_submodule="$(realpath --relative-to="$project_dir" "$abs_submodule")"
+	rel_submodule="$(realpath --relative-to="$project_dir" --canonicalize-missing "$abs_submodule")"
 	# shellcheck disable=SC2181
 	if [ "$?" != 0 ]; then
 	  # TODO maybe we should mkdir -p to the dirname
