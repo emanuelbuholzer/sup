@@ -25,6 +25,11 @@ _sup_usage() {
 	echo "See also 'sup -h <command>' and 'man sup'"
 }
 
+_sup_fatal() {
+  echo "fatal: $1"
+  exit 1
+}
+
 _sup_verbose() {
 	if [ "$SUP_VERBOSE_OUTPUT" = true ]; then
 		echo "$1"
@@ -33,11 +38,9 @@ _sup_verbose() {
 
 _sup_system() {
 	if [ $# = 0 ]; then
-		echo "fatal: no command given to sup_system"
-		exit 1
+		_sup_fatal "no command given to sup_system"
 	elif [ $# -gt 9 ]; then
-		echo "fatal: sup_system supports at most 9 args"
-		exit 1
+		_sup_fatal "sup_system supports at most 9 args"
 	fi
 
 	if [ "$SUP_ECHO_COMMANDS" = true ]; then
@@ -110,22 +113,33 @@ sup_add() {
 	if [ "$?" != 0 ]; then
 		abs_submodule="$submodule"
 	fi
-	submodule="$(realpath --relative-to="$project_dir" "$abs_submodule")"
+	rel_submodule="$(realpath --relative-to="$project_dir" "$abs_submodule")"
 	# shellcheck disable=SC2181
 	if [ "$?" != 0 ]; then
+	  # TODO maybe we should mkdir -p to the dirname
 		echo "fatal: could not determine relative submodule path"
 		exit 1
 	fi
 
-	cd "$(git rev-parse --show-toplevel)" || echo "fatal: could not cd into project directory" && exit 1
+  # TODO what would be needed for this cd to go away?
+	cd "$project_dir" || _sup_fatal "could not cd into project directory"
 
-	# TODO  check by path not by name
-	# 	use rel_submodule (now submodule) as name
-	# 	and work with abs_submodule
-	# 	git config --file .gitmodules --get-regexp 'submodule\..*\.path$'
-	if [ "$(git submodule status "$1" 2>/dev/null)" ]; then
-		echo "$submodule"
-		existing_remote="$(git config --file=.gitmodules submodule."$submodule".url)"
+	# TODO this branch needs some _proper_ testing and will probably break for many edge cases
+	if [ "$(git submodule status -- "$abs_submodule" 2>/dev/null)" ]; then
+
+		submodule_name="$(
+			git config --file .gitmodules --get-regexp 'submodule' |
+				grep "\.path $rel_submodule" |
+				awk -F 'submodule\\.|\\.path' '/^submodule\./ {print $2}'
+		)"
+    echo "$submodule_name"
+		existing_remote="$(
+			git config --file=.gitmodules --get-regexp "submodule.$submodule_name.url" \
+				| awk -F ' ' '{print $2}'
+		)"
+
+		echo "$existing_remote"
+
 		if [ "$existing_remote" = "$remote" ]; then
 			echo "already all good"
 			exit 0
@@ -140,7 +154,7 @@ sup_add() {
 		exit 1
 	fi
 
-	echo git submodule add "$remote" --name "$submodule" -- "$abs_submodule"
+	echo git submodule add "$remote" --name "$rel_submodule" -- "$abs_submodule"
 }
 
 sup_status_usage() {
@@ -149,6 +163,7 @@ sup_status_usage() {
 }
 
 sup_status() {
+  echo "status"
 	# cd project-dir
 	# git submodule status
 	# git status
@@ -194,8 +209,7 @@ elif command -v "sup_$command" >/dev/null; then
 		# TODO  depends on git and coreutils
 		# 	test with coreutils, busybox and uutils/coreutils
 		if [ ! "$(command -v git)" ]; then
-			echo "fatal: git not found"
-			exit 1
+			_sup_fatal "git not found"
 		fi
 		if [ ! "$(git rev-parse --show-toplevel)" ]; then
 			exit 1
@@ -205,6 +219,6 @@ elif command -v "sup_$command" >/dev/null; then
 else
 	shift
 	echo "invalid command -- '$command'"
-	echo "try 'sub -h' for more information"
+	echo "try 'sup -h' for more information"
 	exit 1
 fi
