@@ -121,20 +121,17 @@ sup_add() {
 		exit 1
 	fi
 
-  # TODO what would be needed for this cd to go away?
-	cd "$project_dir" || _sup_fatal "could not cd into project directory"
-
 	# TODO this branch needs some _proper_ testing and will probably break for many edge cases
 	if [ "$(git submodule status -- "$abs_submodule" 2>/dev/null)" ]; then
 
 		submodule_name="$(
-			git config --file .gitmodules --get-regexp 'submodule' |
+			git -C "$project_dir" config --file .gitmodules --get-regexp 'submodule' |
 				grep "\.path $rel_submodule" |
 				awk -F 'submodule\\.|\\.path' '/^submodule\./ {print $2}'
 		)"
     echo "$submodule_name"
 		existing_remote="$(
-			git config --file=.gitmodules --get-regexp "submodule.$submodule_name.url" \
+			git -C "$project_dir" config --file=.gitmodules --get-regexp "submodule.$submodule_name.url" \
 				| awk -F ' ' '{print $2}'
 		)"
 
@@ -149,12 +146,12 @@ sup_add() {
 		fi
 	fi
 
-	if [ "$(git status --porcelain | wc -l)" != 0 ]; then
+	if [ "$(git -C "$project_dir" status --porcelain | wc -l)" != 0 ]; then
 		echo "you need a clean worktree to add submodules"
 		exit 1
 	fi
 
-	echo git submodule add "$remote" --name "$rel_submodule" -- "$abs_submodule"
+	echo git -C "$project_dir" submodule add "$remote" --name "$rel_submodule" -- "$abs_submodule"
 }
 
 sup_status_usage() {
