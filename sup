@@ -9,7 +9,7 @@ _sup_usage() {
 	echo "commands:"
 	echo "  add <repository> [--] [<path>]"
 	echo "  status [<path>]"
-	echo "  remote <path> [<repository>]"
+	echo "  repository <path> [<repository>]"
 	echo "  pull [<path>]"
 	echo "  checkout <path>"
 	echo "  clean <path>"
@@ -96,10 +96,8 @@ sup_add_usage() {
 }
 
 sup_add() {
-	# TODO rename to repository
-	# TODO: use git ls-remote --get-url
-	remote="$2"
-	if [ -z "$remote" ]; then
+	repository="$(git ls-remote --get-url "$2")"
+	if [ -z "$repository" ]; then
 		echo "rem"
 		exit 1
 	fi
@@ -132,17 +130,17 @@ sup_add() {
 	)"
 
 	if [ -n "$existing_submodule_name" ]; then
-	  _sup_verbose "found existing submodule $existing_submodule_name"
+		_sup_verbose "found existing submodule $existing_submodule_name"
 
 		existing_remote="$(
-			git -C "$project_dir" config --file=.gitmodules --get-regexp "submodule.$submodule_name.url" |
+			git -C "$project_dir" config --file=.gitmodules --get-regexp "submodule.$existing_submodule_name.url" |
 				awk -F ' ' '{print $2}'
 		)"
-		if [ "$existing_remote" = "$remote" ]; then
-			_sup_verbose "remote of existing submodule matches requested remote"
+		if [ "$existing_remote" = "$repository" ]; then
+			_sup_verbose "remote repository of existing submodule matches requested remote repository"
 			exit 0
 		else
-			echo "not good. remote wrong"
+			echo "not good. repository wrong"
 			exit 1
 		fi
 	fi
@@ -155,11 +153,11 @@ sup_add() {
 	if [ "$SUP_DRY_RUN" = true ]; then
 		echo "running dry"
 		# TODO .git/modules/$rel_submodule check
-		echo git -C "$project_dir" submodule add "$remote" --name "$rel_submodule" -- "$abs_submodule"
+		echo git -C "$project_dir" submodule add "$repository" --name "$rel_submodule" -- "$abs_submodule"
 		echo git commit -m "sup: add submodule thingy"
 	else
 		echo "adding submodule $rel_submodule"
-		git -C "$project_dir" submodule add --name "$rel_submodule" -- "$remote" "$rel_submodule"
+		git -C "$project_dir" submodule add --name "$rel_submodule" -- "$repository" "$rel_submodule"
 		git commit -m "sup: add submodule $rel_submodule"
 	fi
 
