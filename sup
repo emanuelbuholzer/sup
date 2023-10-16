@@ -125,23 +125,21 @@ sup_add() {
 	fi
 
 	# TODO this branch needs some _proper_ testing and will probably break for many edge cases
-	if [ "$(git submodule status -- "$abs_submodule" 2>/dev/null)" ]; then
+	existing_submodule_name="$(
+		git -C "$project_dir" config --file .gitmodules --get-regexp 'submodule' |
+			grep -w "\.path $rel_submodule" |
+			awk -F 'submodule\\.|\\.path' '/^submodule\./ {print $2}'
+	)"
 
-		submodule_name="$(
-			git -C "$project_dir" config --file .gitmodules --get-regexp 'submodule' |
-				grep "\.path $rel_submodule" |
-				awk -F 'submodule\\.|\\.path' '/^submodule\./ {print $2}'
-		)"
-		echo "$submodule_name"
+	if [ -n "$existing_submodule_name" ]; then
+	  _sup_verbose "found existing submodule $existing_submodule_name"
+
 		existing_remote="$(
 			git -C "$project_dir" config --file=.gitmodules --get-regexp "submodule.$submodule_name.url" |
 				awk -F ' ' '{print $2}'
 		)"
-
-		echo "$existing_remote"
-
 		if [ "$existing_remote" = "$remote" ]; then
-			echo "already all good"
+			_sup_verbose "remote of existing submodule matches requested remote"
 			exit 0
 		else
 			echo "not good. remote wrong"
