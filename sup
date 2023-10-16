@@ -16,8 +16,8 @@ _sup_usage() {
 	echo "  rm <path>"
 	echo
 	echo "options:"
-	# TODO dry run
 	echo "  -h  print this usage"
+	echo "  -n  dry run by not making changes"
 	echo "  -q  operate quietly"
 	echo "  -v  verbose output"
 	echo "  -x  echo commands"
@@ -26,8 +26,8 @@ _sup_usage() {
 }
 
 _sup_fatal() {
-  echo "fatal: $1"
-  exit 1
+	echo "fatal: $1"
+	exit 1
 }
 
 _sup_verbose() {
@@ -96,6 +96,8 @@ sup_add_usage() {
 }
 
 sup_add() {
+	# TODO rename to repository
+	# TODO: use git ls-remote --get-url
 	remote="$2"
 	if [ -z "$remote" ]; then
 		echo "rem"
@@ -104,6 +106,8 @@ sup_add() {
 
 	project_dir="$(git rev-parse --show-toplevel)"
 
+	# TODO it'd be nice if this was optional, e.g. with something like
+	# git_url_basename https://github.com/git/git/blob/master/dir.c#L3142
 	submodule="$1"
 	if [ -z "$submodule" ]; then
 		submodule="$(pwd)"
@@ -116,7 +120,6 @@ sup_add() {
 	rel_submodule="$(realpath --relative-to="$project_dir" --canonicalize-missing "$abs_submodule")"
 	# shellcheck disable=SC2181
 	if [ "$?" != 0 ]; then
-	  # TODO maybe we should mkdir -p to the dirname
 		echo "fatal: could not determine relative submodule path"
 		exit 1
 	fi
@@ -129,10 +132,10 @@ sup_add() {
 				grep "\.path $rel_submodule" |
 				awk -F 'submodule\\.|\\.path' '/^submodule\./ {print $2}'
 		)"
-    echo "$submodule_name"
+		echo "$submodule_name"
 		existing_remote="$(
-			git -C "$project_dir" config --file=.gitmodules --get-regexp "submodule.$submodule_name.url" \
-				| awk -F ' ' '{print $2}'
+			git -C "$project_dir" config --file=.gitmodules --get-regexp "submodule.$submodule_name.url" |
+				awk -F ' ' '{print $2}'
 		)"
 
 		echo "$existing_remote"
@@ -151,7 +154,17 @@ sup_add() {
 		exit 1
 	fi
 
-	echo git -C "$project_dir" submodule add "$remote" --name "$rel_submodule" -- "$abs_submodule"
+	if [ "$SUP_DRY_RUN" = true ]; then
+		echo "running dry"
+		# TODO .git/modules/$rel_submodule check
+		echo git -C "$project_dir" submodule add "$remote" --name "$rel_submodule" -- "$abs_submodule"
+		echo git commit -m "sup: add submodule thingy"
+	else
+		echo "adding submodule $rel_submodule"
+		git -C "$project_dir" submodule add --name "$rel_submodule" -- "$remote" "$rel_submodule"
+		git commit -m "sup: add submodule $rel_submodule"
+	fi
+
 }
 
 sup_status_usage() {
@@ -160,20 +173,24 @@ sup_status_usage() {
 }
 
 sup_status() {
-  echo "status"
+	echo "status"
 	# cd project-dir
 	# git submodule status
 	# git status
 }
 
 SUP_OPERATE_QUIETLY=false
+SUP_DRY_RUN=false
 SUP_VERBOSE_OUTPUT=false
 SUP_ECHO_COMMANDS=false
 SUP_PRINT_USAGE=false
-while getopts ":hqvx" opt; do
+while getopts ":hnqvx" opt; do
 	case $opt in
 	h)
 		SUP_PRINT_USAGE=true
+		;;
+	n)
+		SUP_DRY_RUN=true
 		;;
 	q)
 		SUP_OPERATE_QUIETLY=true
