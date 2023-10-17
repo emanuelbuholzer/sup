@@ -96,7 +96,7 @@ sup_add_usage() {
 }
 
 sup_add() {
-	repository="$(git ls-remote --get-url "$2")"
+	repository="$(git ls-remote --get-url "$1")"
 	if [ -z "$repository" ]; then
 		echo "rem"
 		exit 1
@@ -104,11 +104,14 @@ sup_add() {
 
 	project_dir="$(git rev-parse --show-toplevel)"
 
-	# TODO it'd be nice if this was optional, e.g. with something like
-	# git_url_basename https://github.com/git/git/blob/master/dir.c#L3142
-	submodule="$1"
+	submodule="$2"
 	if [ -z "$submodule" ]; then
+		# It'd be nice if this was optional, e.g. with git_url_basename https://github.com/git/git/blob/master/dir.c#L3142
 		submodule="$(pwd)"
+		echo "no path given"
+		echo
+		sup_add_usage
+		exit 1
 	fi
 	abs_submodule="$(readlink --canonicalize-missing "$submodule")"
 	# shellcheck disable=SC2181
@@ -125,7 +128,7 @@ sup_add() {
 	# TODO this branch needs some _proper_ testing and will probably break for many edge cases
 	existing_submodule_name="$(
 		git -C "$project_dir" config --file .gitmodules --get-regexp 'submodule' |
-			grep -w "\.path $rel_submodule" |
+			grep -w ".*\.path $rel_submodule" |
 			awk -F 'submodule\\.|\\.path' '/^submodule\./ {print $2}'
 	)"
 
@@ -140,11 +143,12 @@ sup_add() {
 			_sup_verbose "remote repository of existing submodule matches requested remote repository"
 			exit 0
 		else
-			echo "not good. repository wrong"
+			echo "error: '$rel_submodule' already exists, associated to a different repository"
 			exit 1
 		fi
 	fi
 
+	# TODO: check if we could remove this and make add, rm possible without commits
 	if [ "$(git -C "$project_dir" status --porcelain | wc -l)" != 0 ]; then
 		echo "you need a clean worktree to add submodules"
 		exit 1
